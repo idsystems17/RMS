@@ -4,7 +4,14 @@ import { useQuiz } from '../../contexts/QuizContext'
 
 const LETRAS = ['A', 'B', 'C', 'D']
 
-export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea, totalAreas, progresso, onResponder, onConcluir }) {
+const FRASES = [
+  'Entendendo seus padrões...',
+  'Identificando suas raízes...',
+  'Seu perfil está se formando...',
+  'Quase lá...',
+]
+
+export default function QuestionScreen({ perguntas, areaId, areaNome, progresso, onResponder, onConcluir }) {
   const { userData } = useQuiz()
   const [indice, setIndice] = useState(0)
   const [selecionada, setSelecionada] = useState(null)
@@ -12,15 +19,14 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea
   const [mostrarReacao, setMostrarReacao] = useState(false)
   const [animando, setAnimando] = useState(false)
 
-  const pergunta = perguntas[indice]
-  const pct = progresso.base + Math.round(((indice + (selecionada ? 1 : 0)) / perguntas.length) * progresso.passo)
+  // Guard: se pergunta não existe, não renderiza nada
+  const pergunta = perguntas?.[indice]
+  if (!pergunta) return null
 
-  const FRASES = [
-    'Entendendo seus padrões...',
-    'Identificando suas raízes...',
-    'Seu perfil está se formando...',
-    'Quase lá...',
-  ]
+  const pct = Math.min(
+    progresso.base + Math.round(((indice + (selecionada ? 1 : 0)) / perguntas.length) * progresso.passo),
+    99
+  )
   const frase = FRASES[Math.min(Math.floor(pct / 25), FRASES.length - 1)]
 
   function getNivel(pontuacao) {
@@ -49,15 +55,19 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea
       textoLivre: textoLivre.trim(),
     })
 
-    setTimeout(() => {
-      setMostrarReacao(false)
-      setSelecionada(null)
-      setTextoLivre('')
-      setAnimando(false)
+    const eUltima = indice + 1 >= perguntas.length
 
-      if (indice + 1 >= perguntas.length) {
+    setTimeout(() => {
+      if (eUltima) {
+        // Última pergunta da área — chama onConcluir direto
+        // O componente vai desmontar, não precisa limpar estado local
         onConcluir()
       } else {
+        // Mais perguntas — avança internamente
+        setMostrarReacao(false)
+        setSelecionada(null)
+        setTextoLivre('')
+        setAnimando(false)
         setIndice(i => i + 1)
       }
     }, 500)
@@ -87,12 +97,11 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea
 
       {/* Corpo */}
       <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           <motion.div
             key={indice}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
             style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
           >
@@ -113,15 +122,10 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea
                     style={{
                       background: sel ? '#EBF3FF' : '#FFFFFF',
                       border: `1.5px solid ${sel ? '#1E3A5F' : '#E2E8F0'}`,
-                      borderRadius: 12,
-                      padding: '13px 15px',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 10,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.18s',
-                      fontFamily: 'inherit',
+                      borderRadius: 12, padding: '13px 15px',
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      cursor: 'pointer', textAlign: 'left',
+                      transition: 'all 0.18s', fontFamily: 'inherit',
                     }}
                   >
                     <div style={{ minWidth: 22, height: 22, borderRadius: 6, background: sel ? '#1E3A5F' : '#E8F0FE', color: sel ? '#fff' : '#1E3A5F', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -146,7 +150,7 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea
                     <span style={{ color: '#1E3A5F', fontWeight: 600 }}>{userData.nome}</span>
                     {reacaoTexto.replace('[Nome]', '').replace(/^,?\s*/, ', ')}
                   </p>
-                  {pergunta.gatilho_continuidade && selecionada && (
+                  {pergunta.gatilho_continuidade && (
                     <p style={{ fontSize: 12, color: 'rgba(26,35,50,0.5)', marginTop: 6 }}>
                       {pergunta.gatilho_continuidade}
                     </p>
@@ -157,10 +161,7 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea
 
             {/* Campo livre */}
             {selecionada && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-              >
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <p style={{ fontSize: 12, color: 'rgba(26,35,50,0.5)', marginBottom: 6 }}>
                   Quer me contar com suas palavras? <span style={{ opacity: 0.6 }}>(opcional)</span>
                 </p>
