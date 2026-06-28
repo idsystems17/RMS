@@ -63,6 +63,7 @@ function QuizFlow({ config, quizId }) {
       )}
       {etapa === ETAPA.QUIZ && areas[areaAtual] && (
         <QuestionScreen
+          key={areaAtual}
           perguntas={areas[areaAtual].perguntas}
           areaId={areas[areaAtual].id}
           areaNome={areas[areaAtual].nome}
