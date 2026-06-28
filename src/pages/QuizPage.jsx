@@ -6,13 +6,14 @@ import QuestionScreen from '../components/quiz/QuestionScreen'
 import ProcessingScreen from '../components/quiz/ProcessingScreen'
 import ResultScreen from '../components/quiz/ResultScreen'
 import { CONFIG_DEMO } from '../services/demoConfig'
+import { gerarDiagnostico } from '../services/geminiApi'
 
 const ETAPA = { BOAS_VINDAS: 'boas_vindas', QUIZ: 'quiz', PROCESSANDO: 'processando', RESULTADO: 'resultado' }
 
 function QuizFlow({ config }) {
   const [etapa, setEtapa] = useState(ETAPA.BOAS_VINDAS)
   const [areaAtual, setAreaAtual] = useState(0)
-  const { registrarResposta, calcularScores, setDiagnostico } = useQuiz()
+  const { userData, respostas, registrarResposta, calcularScores, setDiagnostico } = useQuiz()
 
   const areas = config.areas || []
 
@@ -31,10 +32,20 @@ function QuizFlow({ config }) {
     }
   }
 
-  async function gerarDiagnostico() {
-    calcularScores()
-    // TODO: chamar Claude API / Gemini API com as respostas
-    setDiagnostico('')
+  async function chamarIA() {
+    const scoresFinal = calcularScores()
+    try {
+      const texto = await gerarDiagnostico({
+        config,
+        userData,
+        respostas,
+        scores: scoresFinal,
+      })
+      setDiagnostico(texto)
+    } catch (err) {
+      console.error('Erro ao gerar diagnóstico:', err)
+      setDiagnostico('')
+    }
     setEtapa(ETAPA.RESULTADO)
   }
 
@@ -56,7 +67,7 @@ function QuizFlow({ config }) {
         />
       )}
       {etapa === ETAPA.PROCESSANDO && (
-        <ProcessingScreen onConcluido={gerarDiagnostico} />
+        <ProcessingScreen onConcluido={chamarIA} />
       )}
       {etapa === ETAPA.RESULTADO && (
         <ResultScreen config={config} />
