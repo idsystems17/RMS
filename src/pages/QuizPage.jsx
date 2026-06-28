@@ -7,57 +7,58 @@ import ProcessingScreen from '../components/quiz/ProcessingScreen'
 import ResultScreen from '../components/quiz/ResultScreen'
 import { CONFIG_DEMO } from '../services/demoConfig'
 
-const ETAPAS = { BOAS_VINDAS: 'boas_vindas', QUIZ: 'quiz', PROCESSANDO: 'processando', RESULTADO: 'resultado' }
+const ETAPA = { BOAS_VINDAS: 'boas_vindas', QUIZ: 'quiz', PROCESSANDO: 'processando', RESULTADO: 'resultado' }
 
 function QuizFlow({ config }) {
-  const [etapa, setEtapa] = useState(ETAPAS.BOAS_VINDAS)
+  const [etapa, setEtapa] = useState(ETAPA.BOAS_VINDAS)
   const [areaAtual, setAreaAtual] = useState(0)
   const { registrarResposta, calcularScores, setDiagnostico } = useQuiz()
 
   const areas = config.areas || []
 
+  const totalPerguntas = areas.reduce((s, a) => s + (a.perguntas?.length || 0), 0)
+  const perguntasAnteriores = areas.slice(0, areaAtual).reduce((s, a) => s + (a.perguntas?.length || 0), 0)
+  const progresso = {
+    base: totalPerguntas > 0 ? Math.round((perguntasAnteriores / totalPerguntas) * 90) : 0,
+    passo: totalPerguntas > 0 ? Math.round(((areas[areaAtual]?.perguntas?.length || 0) / totalPerguntas) * 90) : 0,
+  }
+
   function avancarArea() {
     if (areaAtual + 1 >= areas.length) {
-      setEtapa(ETAPAS.PROCESSANDO)
+      setEtapa(ETAPA.PROCESSANDO)
     } else {
       setAreaAtual(i => i + 1)
     }
   }
 
   async function gerarDiagnostico() {
-    const scoresFinal = calcularScores()
+    calcularScores()
     // TODO: chamar Claude API / Gemini API com as respostas
-    // Por ora usa texto placeholder
     setDiagnostico('')
-    setEtapa(ETAPAS.RESULTADO)
-  }
-
-  const totalPerguntas = areas.reduce((s, a) => s + (a.perguntas?.length || 0), 0)
-  const perguntasAnteriores = areas.slice(0, areaAtual).reduce((s, a) => s + (a.perguntas?.length || 0), 0)
-  const progresso = {
-    base: Math.round((perguntasAnteriores / totalPerguntas) * 90),
-    passo: Math.round(((areas[areaAtual]?.perguntas?.length || 0) / totalPerguntas) * 90),
+    setEtapa(ETAPA.RESULTADO)
   }
 
   return (
-    <div className="min-h-screen bg-[#0D1B2A]">
-      {etapa === ETAPAS.BOAS_VINDAS && (
-        <WelcomeScreen config={config} onStart={() => setEtapa(ETAPAS.QUIZ)} />
+    <div style={{ background: '#0D1B2A', minHeight: '100vh' }}>
+      {etapa === ETAPA.BOAS_VINDAS && (
+        <WelcomeScreen config={config} onStart={() => setEtapa(ETAPA.QUIZ)} />
       )}
-      {etapa === ETAPAS.QUIZ && areas[areaAtual] && (
+      {etapa === ETAPA.QUIZ && areas[areaAtual] && (
         <QuestionScreen
           perguntas={areas[areaAtual].perguntas}
           areaId={areas[areaAtual].id}
           areaNome={areas[areaAtual].nome}
+          indiceArea={areaAtual}
+          totalAreas={areas.length}
           progresso={progresso}
           onResponder={registrarResposta}
           onConcluir={avancarArea}
         />
       )}
-      {etapa === ETAPAS.PROCESSANDO && (
+      {etapa === ETAPA.PROCESSANDO && (
         <ProcessingScreen onConcluido={gerarDiagnostico} />
       )}
-      {etapa === ETAPAS.RESULTADO && (
+      {etapa === ETAPA.RESULTADO && (
         <ResultScreen config={config} />
       )}
     </div>

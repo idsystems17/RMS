@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuiz } from '../../contexts/QuizContext'
-import ProgressBar from '../ui/ProgressBar'
 
-const OPCOES_LETRA = ['A', 'B', 'C', 'D']
+const LETRAS = ['A', 'B', 'C', 'D']
 
-export default function QuestionScreen({ perguntas, areaId, areaNome, progresso, onResponder, onConcluir }) {
+export default function QuestionScreen({ perguntas, areaId, areaNome, indiceArea, totalAreas, progresso, onResponder, onConcluir }) {
   const { userData } = useQuiz()
   const [indice, setIndice] = useState(0)
   const [selecionada, setSelecionada] = useState(null)
   const [textoLivre, setTextoLivre] = useState('')
   const [mostrarReacao, setMostrarReacao] = useState(false)
-  const [reacaoTexto, setReacaoTexto] = useState('')
   const [animando, setAnimando] = useState(false)
 
   const pergunta = perguntas[indice]
-  const progressoAtual = progresso.base + Math.round((indice / perguntas.length) * progresso.passo)
+  const pct = progresso.base + Math.round(((indice + (selecionada ? 1 : 0)) / perguntas.length) * progresso.passo)
 
-  function getNivelResposta(pontuacao) {
+  const FRASES = [
+    'Entendendo seus padrões...',
+    'Identificando suas raízes...',
+    'Seu perfil está se formando...',
+    'Quase lá...',
+  ]
+  const frase = FRASES[Math.min(Math.floor(pct / 25), FRASES.length - 1)]
+
+  function getNivel(pontuacao) {
     if (pontuacao <= 1) return 'baixo'
     if (pontuacao === 2) return 'medio'
     return 'alto'
@@ -26,12 +32,7 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, progresso,
   function handleSelecionar(opcao) {
     if (animando) return
     setSelecionada(opcao)
-
-    const nivel = getNivelResposta(opcao.pontuacao)
-    const reacao = pergunta.reacoes?.[nivel] || pergunta.gatilho_continuidade || ''
-    setReacaoTexto(reacao)
-
-    setTimeout(() => setMostrarReacao(true), 300)
+    setTimeout(() => setMostrarReacao(true), 250)
   }
 
   function handleProxima() {
@@ -44,7 +45,7 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, progresso,
       pergunta: pergunta.texto,
       opcao: selecionada.texto,
       pontuacao: selecionada.pontuacao,
-      crenca: selecionada.crenca_revelada,
+      crenca: selecionada.crenca_revelada || '',
       textoLivre: textoLivre.trim(),
     })
 
@@ -59,96 +60,133 @@ export default function QuestionScreen({ perguntas, areaId, areaNome, progresso,
       } else {
         setIndice(i => i + 1)
       }
-    }, 600)
+    }, 500)
   }
 
-  return (
-    <div className="flex flex-col min-h-screen max-w-md mx-auto">
-      <ProgressBar progresso={progressoAtual} nome={userData.nome} />
+  const reacaoTexto = selecionada
+    ? (pergunta.reacoes?.[getNivel(selecionada.pontuacao)] || pergunta.gatilho_continuidade || '')
+    : ''
 
-      <div className="flex-1 flex flex-col px-6 py-8">
+  return (
+    <div style={{ background: '#F5F3EE', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Header dark com progress */}
+      <div style={{ background: '#0D1B2A', padding: '1rem 1.5rem 1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.12)', borderRadius: 2 }}>
+            <div style={{ height: '100%', borderRadius: 2, background: 'linear-gradient(90deg, #2D5A8E, #C9A84C)', width: `${pct}%`, transition: 'width 0.6s ease' }} />
+          </div>
+          <span style={{ fontSize: 11, color: '#C9A84C', fontWeight: 500, minWidth: 28, textAlign: 'right' }}>{pct}%</span>
+        </div>
+        <p style={{ fontSize: 11, color: 'rgba(240,244,248,0.55)' }}>{frase}</p>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: 20, padding: '4px 10px', marginTop: 10 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C9A84C' }} />
+          <span style={{ fontSize: 11, color: '#C9A84C' }}>{areaNome} · Pergunta {indice + 1} de {perguntas.length}</span>
+        </div>
+      </div>
+
+      {/* Corpo */}
+      <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={indice}
-            initial={{ opacity: 0, x: 30 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={{ duration: 0.35 }}
-            className="flex-1 flex flex-col"
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
           >
-            {/* Área */}
-            <span className="text-[#C9A84C] text-xs font-semibold uppercase tracking-widest mb-6">
-              {areaNome}
-            </span>
-
             {/* Pergunta */}
-            <h2 className="text-[#F0F4F8] text-xl font-semibold leading-relaxed mb-8">
-              {pergunta.texto.replace('[Nome]', userData.nome)}
-            </h2>
+            <p style={{ fontSize: 17, fontWeight: 500, color: '#1A2332', lineHeight: 1.5 }}>
+              <span style={{ color: '#1E3A5F', fontWeight: 600 }}>{userData.nome}</span>
+              {pergunta.texto.replace('[Nome]', '').replace(/^,?\s*/, ', ')}
+            </p>
 
             {/* Opções */}
-            <div className="space-y-3 mb-6">
-              {pergunta.opcoes.map((opcao, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSelecionar(opcao)}
-                  className={`w-full text-left px-5 py-4 rounded-xl border transition-all duration-200 text-sm leading-relaxed cursor-pointer
-                    ${selecionada === opcao
-                      ? 'border-[#C9A84C] bg-[#C9A84C]/10 text-[#F0F4F8]'
-                      : 'border-[#1E3A5F] bg-[#112238] text-[#8BA4C0] hover:border-[#2A4F7A] hover:text-[#F0F4F8]'
-                    }`}
-                >
-                  <span className="font-bold text-[#C9A84C] mr-3">{OPCOES_LETRA[i]})</span>
-                  {opcao.texto}
-                </button>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pergunta.opcoes.map((opcao, i) => {
+                const sel = selecionada === opcao
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleSelecionar(opcao)}
+                    style={{
+                      background: sel ? '#EBF3FF' : '#FFFFFF',
+                      border: `1.5px solid ${sel ? '#1E3A5F' : '#E2E8F0'}`,
+                      borderRadius: 12,
+                      padding: '13px 15px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.18s',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <div style={{ minWidth: 22, height: 22, borderRadius: 6, background: sel ? '#1E3A5F' : '#E8F0FE', color: sel ? '#fff' : '#1E3A5F', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {LETRAS[i]}
+                    </div>
+                    <span style={{ fontSize: 14, color: '#1A2332', lineHeight: 1.45 }}>{opcao.texto}</span>
+                  </button>
+                )
+              })}
             </div>
+
+            {/* Reação contextual */}
+            <AnimatePresence>
+              {mostrarReacao && reacaoTexto && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  style={{ background: '#fff', borderRadius: 12, borderLeft: '3px solid #C9A84C', padding: '14px 15px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+                >
+                  <p style={{ fontSize: 13, color: '#1A2332', lineHeight: 1.6 }}>
+                    <span style={{ color: '#1E3A5F', fontWeight: 600 }}>{userData.nome}</span>
+                    {reacaoTexto.replace('[Nome]', '').replace(/^,?\s*/, ', ')}
+                  </p>
+                  {pergunta.gatilho_continuidade && selecionada && (
+                    <p style={{ fontSize: 12, color: 'rgba(26,35,50,0.5)', marginTop: 6 }}>
+                      {pergunta.gatilho_continuidade}
+                    </p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Campo livre */}
             {selecionada && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="mb-6"
               >
+                <p style={{ fontSize: 12, color: 'rgba(26,35,50,0.5)', marginBottom: 6 }}>
+                  Quer me contar com suas palavras? <span style={{ opacity: 0.6 }}>(opcional)</span>
+                </p>
                 <textarea
-                  placeholder="💬 Quer me contar com suas palavras? (opcional)"
                   value={textoLivre}
                   onChange={e => setTextoLivre(e.target.value)}
                   rows={2}
-                  className="w-full bg-[#112238] border border-[#1E3A5F] rounded-xl px-4 py-3 text-[#F0F4F8] placeholder-[#4A6A8A] focus:outline-none focus:border-[#2A4F7A] text-sm resize-none transition-colors"
+                  placeholder="Descreva com suas palavras..."
+                  style={{ width: '100%', background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 10, padding: '12px 14px', color: '#1A2332', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none' }}
                 />
               </motion.div>
             )}
-
-            {/* Reação contextual */}
-            <AnimatePresence>
-              {mostrarReacao && reacaoTexto && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="bg-[#1E3A5F] rounded-xl px-5 py-4 mb-6"
-                >
-                  <p className="text-[#8BA4C0] text-sm leading-relaxed italic">
-                    {reacaoTexto.replace('[Nome]', userData.nome)}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.div>
         </AnimatePresence>
 
         {/* Botão avançar */}
         {selecionada && (
           <motion.button
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={handleProxima}
             disabled={animando}
-            className="w-full py-4 bg-[#C9A84C] text-[#0D1B2A] rounded-xl font-semibold text-base transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer"
+            style={{ width: '100%', background: '#1E3A5F', color: '#fff', border: 'none', borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: animando ? 0.5 : 1, transition: 'opacity 0.2s' }}
           >
-            {indice + 1 >= perguntas.length ? 'Concluir área →' : 'Próxima pergunta →'}
+            {indice + 1 >= perguntas.length ? 'Concluir área' : 'Próxima pergunta'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </motion.button>
         )}
       </div>
