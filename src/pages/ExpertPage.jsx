@@ -1,66 +1,73 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import ChatInterview from '../components/expert/ChatInterview'
+import ReviewPanel from '../components/expert/ReviewPanel'
 
-// Placeholder — módulo expert será construído na próxima fase
+const ETAPA = { LOGIN: 'login', ENTREVISTA: 'entrevista', REVISAO: 'revisao' }
+
 export default function ExpertPage() {
+  const [etapa, setEtapa] = useState(ETAPA.LOGIN)
   const [senha, setSenha] = useState('')
-  const [autenticado, setAutenticado] = useState(false)
   const [erro, setErro] = useState('')
+  const [configGerada, setConfigGerada] = useState(null)
 
-  // Senha provisória para MVP — será configurável via env
-  const SENHA_MVP = import.meta.env.VITE_EXPERT_PASSWORD || 'rms2025'
+  const SENHA = import.meta.env.VITE_EXPERT_PASSWORD || 'rms2025'
 
   function handleLogin(e) {
     e.preventDefault()
-    if (senha === SENHA_MVP) {
-      setAutenticado(true)
+    if (senha === SENHA) {
+      setEtapa(ETAPA.ENTREVISTA)
     } else {
       setErro('Senha incorreta.')
       setSenha('')
     }
   }
 
-  if (!autenticado) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0D1B2A] px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm"
-        >
-          <div className="text-center mb-8">
-            <span className="text-4xl text-[#C9A84C]">◈</span>
-            <h1 className="text-xl font-bold text-[#F0F4F8] mt-4">Painel do Expert</h1>
-            <p className="text-[#8BA4C0] text-sm mt-2">Acesso restrito</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              placeholder="Senha de acesso"
-              value={senha}
-              onChange={e => { setSenha(e.target.value); setErro('') }}
-              className="w-full bg-[#112238] border border-[#1E3A5F] rounded-xl px-5 py-4 text-[#F0F4F8] placeholder-[#4A6A8A] focus:outline-none focus:border-[#C9A84C] transition-colors"
-            />
-            {erro && <p className="text-red-400 text-sm text-center">{erro}</p>}
-            <button
-              type="submit"
-              className="w-full py-4 bg-[#C9A84C] text-[#0D1B2A] rounded-xl font-semibold hover:brightness-110 transition-all cursor-pointer"
-            >
-              Entrar
-            </button>
-          </form>
-        </motion.div>
-      </div>
-    )
+  function handleEntrevistaConcluida(config) {
+    setConfigGerada(config)
+    setEtapa(ETAPA.REVISAO)
   }
 
+  if (etapa === ETAPA.ENTREVISTA) {
+    return <ChatInterview onConcluido={handleEntrevistaConcluida} />
+  }
+
+  if (etapa === ETAPA.REVISAO) {
+    return <ReviewPanel config={configGerada} />
+  }
+
+  // Login
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#0D1B2A] px-6">
-      <div className="text-center">
-        <span className="text-4xl text-[#C9A84C]">◈</span>
-        <h1 className="text-xl font-bold text-[#F0F4F8] mt-4">Painel do Expert</h1>
-        <p className="text-[#8BA4C0] text-sm mt-2">Em construção — próxima fase</p>
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0D1B2A', padding: '2rem' }}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ width: '100%', maxWidth: 320 }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <span style={{ fontSize: 40, color: '#C9A84C' }}>◈</span>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F0F4F8', marginTop: 16, marginBottom: 6 }}>Painel do Expert</h1>
+          <p style={{ fontSize: 13, color: 'rgba(240,244,248,0.4)' }}>A IA vai estruturar seu método passo a passo</p>
+        </div>
+
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            type="password"
+            placeholder="Senha de acesso"
+            value={senha}
+            onChange={e => { setSenha(e.target.value); setErro('') }}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '14px 16px', color: '#F0F4F8', fontSize: 15, fontFamily: 'inherit', outline: 'none' }}
+            autoFocus
+          />
+          {erro && <p style={{ color: '#FC8181', fontSize: 13, textAlign: 'center' }}>{erro}</p>}
+          <button
+            type="submit"
+            style={{ width: '100%', background: '#C9A84C', color: '#0D1B2A', border: 'none', borderRadius: 12, padding: 15, fontSize: 15, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}
+          >
+            Entrar
+          </button>
+        </form>
+      </motion.div>
     </div>
   )
 }
