@@ -78,22 +78,33 @@ export default function ChatInterview({ onConcluido }) {
 
   async function iniciarChat() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+    if (!apiKey) {
+      setMensagens([{ role: 'assistant', texto: '⚠️ Chave da API não configurada. Verifique as variáveis de ambiente.' }])
+      return
+    }
+
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
       model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
     })
 
-    const sessao = model.startChat({ history: [] })
+    // Passa o system prompt como primeira mensagem do histórico
+    const sessao = model.startChat({
+      history: [
+        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+        { role: 'model', parts: [{ text: 'Entendido. Estou pronto para conduzir a entrevista estruturada e gerar o JSON do quiz. Pode começar.' }] },
+      ],
+    })
     setChat(sessao)
-
     setCarregando(true)
+
     try {
-      const result = await sessao.sendMessage('Olá! Vamos começar a entrevista para estruturar meu método.')
+      const result = await sessao.sendMessage('Pode começar!')
       const texto = result.response.text()
       setMensagens([{ role: 'assistant', texto }])
     } catch (err) {
-      console.error(err)
+      console.error('Erro ao iniciar chat:', err)
+      setMensagens([{ role: 'assistant', texto: `⚠️ Erro ao conectar com a IA: ${err?.message || 'verifique a chave da API e tente novamente.'}` }])
     } finally {
       setCarregando(false)
     }
