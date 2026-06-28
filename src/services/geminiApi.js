@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash'
+const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash'
 
 function buildPrompt(config, userData, respostas, scores) {
   const resumoRespostas = respostas.map(r => {
