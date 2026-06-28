@@ -139,7 +139,7 @@ export default function ChatInterview({ onConcluido }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0D1B2A' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#0D1B2A' }}>
 
       {/* Header */}
       <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -67,7 +67,7 @@ export default function ExpertPage() {
 
   // Painel principal com abas
   return (
-    <div style={{ minHeight: '100vh', background: '#0D1B2A', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', background: '#0D1B2A', display: 'flex', flexDirection: 'column' }}>
 
       {/* Header com abas */}
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
