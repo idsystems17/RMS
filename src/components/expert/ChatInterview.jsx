@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createGroqChatSession } from '../../services/groqApi'
 
 const SYSTEM_PROMPT = `Você é um assistente especializado em estruturar métodos de transformação pessoal em quizzes interativos de diagnóstico.
 
@@ -82,27 +83,40 @@ export default function ChatInterview({ onConcluido }) {
   }, [mensagens, carregando])
 
   async function iniciarChat() {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey) {
-      setMensagens([{ role: 'assistant', texto: '⚠️ Chave da API não configurada. Verifique as variáveis de ambiente.' }])
-      return
-    }
+    const provider = import.meta.env.VITE_AI_PROVIDER || 'gemini'
 
     setErroConexao(false)
     setCarregando(true)
     setMensagens([])
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash',
-    })
+    let sessao
+    if (provider === 'groq') {
+      const apiKey = import.meta.env.VITE_GROQ_API_KEY
+      if (!apiKey) {
+        setMensagens([{ role: 'assistant', texto: '⚠️ VITE_GROQ_API_KEY não configurada.' }])
+        setCarregando(false)
+        return
+      }
+      sessao = createGroqChatSession(SYSTEM_PROMPT)
+    } else {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      if (!apiKey) {
+        setMensagens([{ role: 'assistant', texto: '⚠️ VITE_GEMINI_API_KEY não configurada.' }])
+        setCarregando(false)
+        return
+      }
+      const genAI = new GoogleGenerativeAI(apiKey)
+      const model = genAI.getGenerativeModel({
+        model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash',
+      })
+      sessao = model.startChat({
+        history: [
+          { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+          { role: 'model', parts: [{ text: 'Entendido. Estou pronto para conduzir a entrevista estruturada e gerar o JSON do quiz. Pode começar.' }] },
+        ],
+      })
+    }
 
-    const sessao = model.startChat({
-      history: [
-        { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-        { role: 'model', parts: [{ text: 'Entendido. Estou pronto para conduzir a entrevista estruturada e gerar o JSON do quiz. Pode começar.' }] },
-      ],
-    })
     setChat(sessao)
 
     let tentativas = 0

@@ -1,7 +1,47 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { gerarDiagnosticoGroq } from './groqApi'
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const GROQ_MODEL = import.meta.env.VITE_GROQ_MODEL || 'llama-3.3-70b-versatile'
 
-const MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash'
+async function groqFetch(messages) {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY
+  if (!apiKey) throw new Error('VITE_GROQ_API_KEY não configurada')
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages,
+      max_tokens: 2048,
+      temperature: 0.7,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = new Error(`[${res.status}] ${res.statusText}`)
+    err.status = res.status
+    throw err
+  }
+
+  const data = await res.json()
+  return data.choices[0].message.content
+}
+
+// Retorna uma sessão de chat com a mesma interface do Gemini: { sendMessage(text) }
+export function createGroqChatSession(systemPrompt) {
+  const messages = [{ role: 'system', content: systemPrompt }]
+
+  return {
+    async sendMessage(text) {
+      messages.push({ role: 'user', content: text })
+      const content = await groqFetch(messages)
+      messages.push({ role: 'assistant', content })
+      return { response: { text: () => content } }
+    },
+  }
+}
 
 function buildPrompt(config, userData, respostas, scores) {
   const resumoRespostas = respostas.map(r => {
@@ -52,27 +92,16 @@ Gere o diagnóstico em 3 partes, sem títulos ou separadores — texto contínuo
 3. Próximo passo recomendado — conduza naturalmente para a mentoria sem soar como propaganda`
 }
 
-export async function gerarDiagnostico({ config, userData, respostas, scores }) {
-  const provider = import.meta.env.VITE_AI_PROVIDER || 'gemini'
-  if (provider === 'groq') {
-    return gerarDiagnosticoGroq({ config, userData, respostas, scores })
-  }
-
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-  if (!apiKey) throw new Error('VITE_GEMINI_API_KEY não configurada')
-
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: MODEL })
-
+export async function gerarDiagnosticoGroq({ config, userData, respostas, scores }) {
   const prompt = buildPrompt(config, userData, respostas, scores)
+  const messages = [{ role: 'user', content: prompt }]
 
   let tentativas = 0
   while (tentativas < 3) {
     try {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
+      return await groqFetch(messages)
     } catch (err) {
-      if (err?.status === 503 && tentativas < 2) {
+      if ((err?.status === 503 || err?.status === 429) && tentativas < 2) {
         tentativas++
         await new Promise(r => setTimeout(r, 2000 * tentativas))
         continue
