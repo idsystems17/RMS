@@ -61,10 +61,15 @@ function extrairJSON(texto) {
   }
 }
 
+function is503(err) {
+  return err?.status === 503 || err?.message?.includes('[503')
+}
+
 export default function ChatInterview({ onConcluido }) {
   const [mensagens, setMensagens] = useState([])
   const [input, setInput] = useState('')
   const [carregando, setCarregando] = useState(false)
+  const [erroConexao, setErroConexao] = useState(false)
   const [chat, setChat] = useState(null)
   const bottomRef = useRef(null)
 
@@ -83,12 +88,15 @@ export default function ChatInterview({ onConcluido }) {
       return
     }
 
+    setErroConexao(false)
+    setCarregando(true)
+    setMensagens([])
+
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
       model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash',
     })
 
-    // Passa o system prompt como primeira mensagem do histórico
     const sessao = model.startChat({
       history: [
         { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
@@ -96,18 +104,26 @@ export default function ChatInterview({ onConcluido }) {
       ],
     })
     setChat(sessao)
-    setCarregando(true)
 
-    try {
-      const result = await sessao.sendMessage('Pode começar!')
-      const texto = result.response.text()
-      setMensagens([{ role: 'assistant', texto }])
-    } catch (err) {
-      console.error('Erro ao iniciar chat:', err)
-      setMensagens([{ role: 'assistant', texto: `⚠️ Erro ao conectar com a IA: ${err?.message || 'verifique a chave da API e tente novamente.'}` }])
-    } finally {
-      setCarregando(false)
+    let tentativas = 0
+    while (tentativas < 4) {
+      try {
+        const result = await sessao.sendMessage('Pode começar!')
+        setMensagens([{ role: 'assistant', texto: result.response.text() }])
+        setCarregando(false)
+        return
+      } catch (err) {
+        tentativas++
+        if (is503(err) && tentativas < 4) {
+          await new Promise(r => setTimeout(r, 2000 * tentativas))
+          continue
+        }
+        console.error('Erro ao iniciar chat:', err)
+        setErroConexao(true)
+        break
+      }
     }
+    setCarregando(false)
   }
 
   async function enviar() {
@@ -118,24 +134,29 @@ export default function ChatInterview({ onConcluido }) {
     setMensagens(prev => [...prev, { role: 'user', texto: textoUsuario }])
     setCarregando(true)
 
-    try {
-      const result = await chat.sendMessage(textoUsuario)
-      const resposta = result.response.text()
-
-      setMensagens(prev => [...prev, { role: 'assistant', texto: resposta }])
-
-      if (resposta.includes('ENTREVISTA_CONCLUIDA')) {
-        const config = extrairJSON(resposta)
-        if (config) {
-          setTimeout(() => onConcluido(config), 1200)
+    let tentativas = 0
+    while (tentativas < 3) {
+      try {
+        const result = await chat.sendMessage(textoUsuario)
+        const resposta = result.response.text()
+        setMensagens(prev => [...prev, { role: 'assistant', texto: resposta }])
+        if (resposta.includes('ENTREVISTA_CONCLUIDA')) {
+          const config = extrairJSON(resposta)
+          if (config) setTimeout(() => onConcluido(config), 1200)
         }
+        break
+      } catch (err) {
+        tentativas++
+        if (is503(err) && tentativas < 3) {
+          await new Promise(r => setTimeout(r, 2000 * tentativas))
+          continue
+        }
+        console.error(err)
+        setMensagens(prev => [...prev, { role: 'assistant', texto: '⚠️ A IA está sobrecarregada. Aguarde alguns segundos e tente enviar novamente.' }])
+        break
       }
-    } catch (err) {
-      console.error(err)
-      setMensagens(prev => [...prev, { role: 'assistant', texto: 'Ocorreu um erro. Tente novamente.' }])
-    } finally {
-      setCarregando(false)
     }
+    setCarregando(false)
   }
 
   return (
@@ -152,6 +173,21 @@ export default function ChatInterview({ onConcluido }) {
 
       {/* Mensagens */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+        {erroConexao && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '2rem 1rem', textAlign: 'center' }}>
+            <p style={{ fontSize: 14, color: 'rgba(240,244,248,0.6)', lineHeight: 1.6 }}>
+              A IA está sobrecarregada no momento.<br />Aguarde alguns segundos e tente novamente.
+            </p>
+            <button
+              onClick={iniciarChat}
+              style={{ background: '#C9A84C', color: '#0D1B2A', border: 'none', borderRadius: 10, padding: '10px 24px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
         <AnimatePresence>
           {mensagens.map((msg, i) => (
             <motion.div
@@ -206,11 +242,11 @@ export default function ChatInterview({ onConcluido }) {
           placeholder="Responda aqui... (Enter para enviar)"
           rows={2}
           style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '12px 16px', color: '#F0F4F8', fontSize: 14, fontFamily: 'inherit', outline: 'none', resize: 'none' }}
-          disabled={carregando}
+          disabled={carregando || erroConexao}
         />
         <button
           onClick={enviar}
-          disabled={carregando || !input.trim()}
+          disabled={carregando || erroConexao || !input.trim()}
           style={{ background: '#C9A84C', border: 'none', borderRadius: 12, padding: '0 18px', cursor: 'pointer', opacity: (carregando || !input.trim()) ? 0.4 : 1, transition: 'opacity 0.2s', flexShrink: 0 }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D1B2A" strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
